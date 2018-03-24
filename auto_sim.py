@@ -21,16 +21,12 @@ def get_standings():
     url="https://www.si.com/nba/standings/league"
     html=urlopen(url)
     soup =bs(html,'html.parser')
-
     column_headers = [th.getText() for th in
                       soup.findAll('tr', limit=2)[0].findAll('th')]
-
-    data_rows = soup.findAll('tr')[1:]  # skip the first header row
-
+    data_rows = soup.findAll('tr')[1:] 
     player_data = [[td.getText() for td in data_rows[i].findAll('td')]
                    for i in range(len(data_rows))]
-
-
+    
     df = pd.DataFrame(player_data, columns=column_headers)
     df = df.replace('\n','', regex=True).apply(lambda x: x.str.strip()
                                                if x.dtype == "object"
@@ -64,8 +60,7 @@ def do_sim(schedule, standings):
     results['Owner']=['Myra', 'Keegan', 'Kyle',
                       'Kunal', 'Blake', 'Mike']
     nWins=[]
-    for team_list in own:
-        
+    for team_list in own:   
         sum=0
         for name in team_list:
             home=schedule[schedule['team1']==name]['T1_Win']
@@ -141,53 +136,53 @@ def job():
         head, my_list=my_list[0], my_list[1:]
         df=pd.DataFrame(my_list, columns=head)
 
-        #Extract current date predictions
+    #Extract current date predictions
 
-        df['dif']=[(datetime.strptime(date,'%Y-%m-%d')-datetime.today()).days
-                   for date in df['date'].values]
+    df['dif']=[(datetime.strptime(date,'%Y-%m-%d')-datetime.today()).days
+               for date in df['date'].values]
 
-        future=df[df['dif'] > -2].drop(columns=['season','neutral','playoff',
-                                                'elo1_pre' ,'dif',
-                                                'carmelo2_post','carmelo_prob1'
-                                                ,'carmelo_prob2','carmelo1_post'
-                                                ,'elo1_post','elo2_post',
-                                                'elo2_pre' ,'elo_prob2',
-                                                'elo_prob1', 'score1','score2'])
+    future=df[df['dif'] > -2].drop(columns=['season','neutral','playoff',
+                                            'elo1_pre' ,'dif',
+                                            'carmelo2_post','carmelo_prob1'
+                                            ,'carmelo_prob2','carmelo1_post'
+                                            ,'elo1_post','elo2_post',
+                                            'elo2_pre' ,'elo_prob2',
+                                            'elo_prob1', 'score1','score2'])
 
-        probs=[get_prob(float(future['carmelo1_pre'].values[i])
-                        - float(future['carmelo2_pre'].values[i])
-                        + 100.) for i in range(len(future))]
-        future['prob1']=probs
+    probs=[get_prob(float(future['carmelo1_pre'].values[i])
+                    - float(future['carmelo2_pre'].values[i])
+                    + 100.) for i in range(len(future))]
+    future['prob1']=probs
 
-        # Simulate season, then import current rankings and add current wins
-        nSim=10000
-        rank=range(1,7)
-        results=pd.DataFrame()
-        standings=get_standings()
-        for i in range(nSim):
-            run=do_sim(future, standings)
-            run['Rank']=rank
-            results=results.append(run)
-            print i
+    # Simulate season, then import current rankings and add current wins
+    nSim=10000
+    rank=range(1,7)
+    results=pd.DataFrame()
+    standings=get_standings()
+    for i in range(nSim):
+        run=do_sim(future, standings)
+        run['Rank']=rank
+        results=results.append(run)
+        print i
 
-            results=results.sort_values(by='Owner')
-            players=results['Owner'].drop_duplicates()
+    results=results.sort_values(by='Owner')
+    players=results['Owner'].drop_duplicates()
 
-            dirr='./player_chances/'
-            to_df=[]
-            for play in players:
-                cash=[play]+get_hists(results, play, dirr)
-                print play
-                to_df.append(cash)
+    dirr='./player_chances/'
+    to_df=[]
+    for play in players:
+        cash=[play]+get_hists(results, play, dirr)
+        print play
+        to_df.append(cash)
 
-
-                output=pd.DataFrame(to_df, columns=['Player','Freq Win'
-                                                    ,'Freq 2nd','Freq Cash'
-                                                    ,'Average wins','Std Dev'])
-                output=output[:].apply(pd.to_numeric, errors='ignore')
-                output=output.sort_values('Freq Cash', ascending=False)
-                output.iloc[:,1:4]=output.iloc[:,1:4]/100.
-                output.to_csv(dirr+'NBA_sim.csv')
+            
+    output=pd.DataFrame(to_df, columns=['Player','Freq Win'
+                                        ,'Freq 2nd','Freq Cash'
+                                        ,'Average wins','Std Dev'])
+    output=output[:].apply(pd.to_numeric, errors='ignore')
+    output=output.sort_values('Freq Cash', ascending=False)
+    output.iloc[:,1:4]=output.iloc[:,1:4]/100.
+    output.to_csv(dirr+'NBA_sim.csv')
     return 'Done'
 
 schedule.every().day.at("9:00").do(job)
