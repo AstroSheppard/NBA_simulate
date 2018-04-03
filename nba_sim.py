@@ -15,30 +15,23 @@ import time
 def get_prob(delta):
     return 1./(1.0+10**(-1*delta/400.))
 
-
-def get_standings():
-
-    url="https://www.si.com/nba/standings/league"
-    html=urlopen(url)
-    soup =bs(html,'html.parser')
-
-    column_headers = [th.getText() for th in
-                      soup.findAll('tr', limit=2)[0].findAll('th')]
-
-    data_rows = soup.findAll('tr')[1:]  # skip the first header row
-
-    player_data = [[td.getText() for td in data_rows[i].findAll('td')]
-                   for i in range(len(data_rows))]
-
-
-    df = pd.DataFrame(player_data, columns=column_headers)
-    df = df.replace('\n','', regex=True).apply(lambda x: x.str.strip()
-                                               if x.dtype == "object"
-                                               else x).sort_values('\n')
-    temp=df.iloc[3,:].copy()
-    df.iloc[3,:], df.iloc[4,:]=df.iloc[4,:], temp
-    wins=df.iloc[:,1].values.astype(int)
-    return wins
+def get_standings(past):
+    own=np.asarray([['GSW', 'LAC', 'MEM', 'PHO','ORL']
+                    ,['POR','HOU','TOR','DET','NYK']
+                    ,['CLE','MIN','UTA','IND','BRK']
+                    ,['DAL','MIL','SAS','SAC','NOP']
+                    ,['OKC','DEN','ATL','PHI','MIA']
+                    ,['BOS','CHO','CHI','WAS','LAL']])
+    nWins=[]
+    for team_list in own:       
+        sum=0
+        for name in team_list:
+            home=past[past['team1']==name]['T1_win']
+            away=1-past[past['team2']==name]['T1_win']
+            sum=sum+(home.sum()+away.sum())
+        nWins.append(sum)
+    return nWins
+    
 
 def do_sim(schedule, standings):
 
@@ -50,28 +43,24 @@ def do_sim(schedule, standings):
                     ,['OKC','DEN','ATL','PHI','MIA']
                     ,['BOS','CHO','CHI','WAS','LAL']])
 
-    # Get dict for current standings
-    team=own.flatten()
-    team=np.sort(team)
-    current=dict(zip(team,standings))
 
     test=np.random.rand(len(schedule))
     schedule['T1_Win']=test<schedule['prob1']
     schedule['T2_Win']=1-schedule['T1_Win']
+    
     # We now have the result of each game. Must find total wins for each
     # team, then for each owner
     results=pd.DataFrame()
     results['Owner']=['Myra', 'Keegan', 'Kyle',
                       'Kunal', 'Blake', 'Mike']
     nWins=[]
-    for team_list in own:
-        
-        sum=0
+    for i,team_list in enumerate(own):
+        sum=standings[i]
         for name in team_list:
             home=schedule[schedule['team1']==name]['T1_Win']
             away=schedule[schedule['team2']==name]['T2_Win']
-            sum=sum+(home.sum()+away.sum())+current[name]
-        nWins.append(sum)
+            sum=sum+(home.sum()+away.sum()
+        nWins.append(sum)   
     results['Wins']=nWins
     return results.sort_values(by='Wins', ascending=False)
 
@@ -151,21 +140,34 @@ future=df[df['dif'] > -2].drop(columns=['season','neutral','playoff','elo1_pre'
                                         ,'elo_prob2', 'elo_prob1', 'score1'
                                         ,'score2'])
 
+past=df[(df['dif'] <= -2) & (
+    df['season'] == '2018')].drop(columns=['season','neutral','playoff'
+                                           ,'elo1_pre' ,'dif', 'carmelo2_post'
+                                           ,'carmelo_prob1' ,'carmelo_prob2'
+                                           ,'carmelo1_post' ,'elo1_post'
+                                           ,'elo2_post', 'elo2_pre','elo_prob2'
+                                           ,'elo_prob1'])
+past['T1_win'] = [float(past['score1'].values[i])>
+                  float(past['score2'].values[i])
+                  for i in range(len(past))]
+
 probs=[get_prob(float(future['carmelo1_pre'].values[i])
                 - float(future['carmelo2_pre'].values[i])
                 + 100.) for i in range(len(future))]
 future['prob1']=probs
 
+
 # Simulate season, then import current rankings and add current wins
-nSim=10000
+nSim=5000
 rank=range(1,7)
 results=pd.DataFrame()
-standings=get_standings()
+standings=get_standings(past)
 for i in range(nSim):
     run=do_sim(future, standings)
     run['Rank']=rank
     results=results.append(run)
     print i
+
 
 results=results.sort_values(by='Owner')
 players=results['Owner'].drop_duplicates()
@@ -186,5 +188,3 @@ output.iloc[:,1:4]=output.iloc[:,1:4]/100.
 output.to_csv(dirr+'NBA_sim.csv')
 
 
-
-# To add: Frequency of each person winning and cashing
