@@ -54,10 +54,8 @@ def do_sim(schedule, standings):
     results['Owner']=['Myra', 'Keegan', 'Kyle',
                       'Kunal', 'Blake', 'Mike']
     nWins=[]
-    i=0
-    for team_list in own:
+    for i,team_list in enumerate(own):
         sum=standings[i]
-        i+=1
         for name in team_list:
             home=schedule[schedule['team1']==name]['T1_Win']
             away=schedule[schedule['team2']==name]['T2_Win']
@@ -162,8 +160,8 @@ future['prob1']=probs
 # Simulate season, then import current rankings and add current wins
 nSim=5000
 rank=range(1,7)
-results=pd.DataFrame(past)
-standings=get_standings()
+results=pd.DataFrame()
+standings=get_standings(past)
 for i in range(nSim):
     run=do_sim(future, standings)
     run['Rank']=rank
