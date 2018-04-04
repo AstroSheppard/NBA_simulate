@@ -59,7 +59,7 @@ def do_sim(schedule, standings):
         for name in team_list:
             home=schedule[schedule['team1']==name]['T1_Win']
             away=schedule[schedule['team2']==name]['T2_Win']
-            sum=sum+(home.sum()+away.sum()
+            sum=sum+(home.sum()+away.sum())
         nWins.append(sum)   
     results['Wins']=nWins
     return results.sort_values(by='Wins', ascending=False)
@@ -114,77 +114,79 @@ def get_hists(df, player, direct):
 
 
 ###########################################################
+if __name__ == "__main__":
 
-CSV_URL='https://projects.fivethirtyeight.com/nba-model/nba_elo.csv'
+    CSV_URL='https://projects.fivethirtyeight.com/nba-model/nba_elo.csv'
 
-with requests.Session() as s:
-    download = s.get(CSV_URL)
-    decoded_content = download.content.decode('utf-8')
+    with requests.Session() as s:
+        download = s.get(CSV_URL)
+        decoded_content = download.content.decode('utf-8')
 
-# Convert to dataframe
+        # Convert to dataframe
 
-    cr = csv.reader(decoded_content.splitlines(), delimiter=',')
-    my_list = list(cr)
-    head, my_list=my_list[0], my_list[1:]
-    df=pd.DataFrame(my_list, columns=head)
+        cr = csv.reader(decoded_content.splitlines(), delimiter=',')
+        my_list = list(cr)
+        head, my_list=my_list[0], my_list[1:]
+        df=pd.DataFrame(my_list, columns=head)
 
-#Extract current date predictions
+    #Extract current date predictions
 
-df['dif']=[(datetime.strptime(date,'%Y-%m-%d')-datetime.today()).days
-           for date in df['date'].values]
+    df['dif']=[(datetime.strptime(date,'%Y-%m-%d')-datetime.today()).days
+               for date in df['date'].values]
 
-future=df[df['dif'] > -2].drop(columns=['season','neutral','playoff','elo1_pre'
-                                        ,'dif', 'carmelo2_post', 'carmelo_prob1'
-                                        ,'carmelo_prob2', 'carmelo1_post'
-                                        ,'elo1_post', 'elo2_post', 'elo2_pre'
-                                        ,'elo_prob2', 'elo_prob1', 'score1'
-                                        ,'score2'])
+    future=df[df['dif'] > -2].drop(columns=['season','neutral','playoff',
+                                            'elo1_pre' ,'dif', 'carmelo2_post'
+                                            ,'carmelo_prob1','carmelo_prob2'
+                                            ,'carmelo1_post','elo1_post'
+                                            ,'elo2_post', 'elo2_pre','elo_prob2'
+                                            ,'elo_prob1', 'score1','score2'])
 
-past=df[(df['dif'] <= -2) & (
-    df['season'] == '2018')].drop(columns=['season','neutral','playoff'
-                                           ,'elo1_pre' ,'dif', 'carmelo2_post'
-                                           ,'carmelo_prob1' ,'carmelo_prob2'
-                                           ,'carmelo1_post' ,'elo1_post'
-                                           ,'elo2_post', 'elo2_pre','elo_prob2'
-                                           ,'elo_prob1'])
-past['T1_win'] = [float(past['score1'].values[i])>
-                  float(past['score2'].values[i])
-                  for i in range(len(past))]
+    past=df[(df['dif'] <= -2) & (
+        df['season'] == '2018')].drop(columns=['season','neutral','playoff'
+                                               ,'elo1_pre' ,'dif'
+                                               ,'carmelo2_post','carmelo_prob1'
+                                               ,'carmelo_prob2','carmelo1_post'
+                                               ,'elo1_post','elo2_post'
+                                               ,'elo2_pre','elo_prob2'
+                                               ,'elo_prob1'])
+    past['T1_win'] = [float(past['score1'].values[i])>
+                      float(past['score2'].values[i])
+                      for i in range(len(past))]
 
-probs=[get_prob(float(future['carmelo1_pre'].values[i])
-                - float(future['carmelo2_pre'].values[i])
-                + 100.) for i in range(len(future))]
-future['prob1']=probs
-
-
-# Simulate season, then import current rankings and add current wins
-nSim=5000
-rank=range(1,7)
-results=pd.DataFrame()
-standings=get_standings(past)
-for i in range(nSim):
-    run=do_sim(future, standings)
-    run['Rank']=rank
-    results=results.append(run)
-    print i
+    probs=[get_prob(float(future['carmelo1_pre'].values[i])
+                    - float(future['carmelo2_pre'].values[i])
+                    + 100.) for i in range(len(future))]
+    future['prob1']=probs
 
 
-results=results.sort_values(by='Owner')
-players=results['Owner'].drop_duplicates()
+    # Simulate season, then import current rankings and add current wins
+    nSim=5000
+    rank=range(1,7)
+    results=pd.DataFrame()
+    standings=get_standings(past)
+    for i in range(nSim):
+        run=do_sim(future, standings)
+        run['Rank']=rank
+        results=results.append(run)
+        print i
 
-dirr='./player_chances/'
-to_df=[]
-for play in players:
-    cash=[play]+get_hists(results, play, dirr)
-    print play
-    to_df.append(cash)
+
+    results=results.sort_values(by='Owner')
+    players=results['Owner'].drop_duplicates()
+
+    dirr='./player_chances/'
+    to_df=[]
+    for play in players:
+        cash=[play]+get_hists(results, play, dirr)
+        print play
+        to_df.append(cash)
 
 
-output=pd.DataFrame(to_df, columns=['Player','Freq Win', 'Freq 2nd'
-                             ,'Freq Cash','Average wins','Std Dev'])
-output=output[:].apply(pd.to_numeric, errors='ignore')
-output=output.sort_values('Freq Cash', ascending=False)
-output.iloc[:,1:4]=output.iloc[:,1:4]/100.
-output.to_csv(dirr+'NBA_sim.csv')
+    output=pd.DataFrame(to_df, columns=['Player','Freq Win', 'Freq 2nd'
+                                        ,'Freq Cash','Average wins','Std Dev'])
+    output=output[:].apply(pd.to_numeric, errors='ignore')
+    output=output.sort_values('Freq Cash', ascending=False)
+    output.iloc[:,1:4]=output.iloc[:,1:4]/100.
+    output.to_csv(dirr+'NBA_sim.csv')
 
 
