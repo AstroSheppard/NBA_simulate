@@ -11,11 +11,13 @@ from bs4 import BeautifulSoup as bs
 import matplotlib.pyplot as plt
 import schedule
 import time
+from tqdm import trange
 
 def get_prob(delta):
     return 1./(1.0+10**(-1*delta/400.))
 
 def get_standings(past):
+    """Return the current NBA standings"""
     own=np.asarray([['GSW', 'LAC', 'MEM', 'PHO','ORL']
                     ,['POR','HOU','TOR','DET','NYK']
                     ,['CLE','MIN','UTA','IND','BRK']
@@ -57,14 +59,16 @@ def do_sim(schedule, standings):
     for i,team_list in enumerate(own):
         sum=standings[i]
         for name in team_list:
-            home=schedule[schedule['team1']==name]['T1_Win']
-            away=schedule[schedule['team2']==name]['T2_Win']
-            sum=sum+(home.sum()+away.sum())
-        nWins.append(sum)   
+            home=schedule.loc[schedule.loc[:,'team1']==name,'T1_Win']
+            away=schedule.loc[schedule.loc[:,'team2']==name,'T2_Win']
+            sum=sum+np.sum(home.values)+ np.sum(away.values)
+        nWins.append(sum)
     results['Wins']=nWins
     return results.sort_values(by='Wins', ascending=False)
 
 def get_hists(df, player, direct):
+    """ Using simulation results, plot and save the distribution
+    of possible places and games won """
     # First get lists of point, rank and money for the player
     wins=df[df['Owner']==player].loc[:,'Wins'].values
     rank=df[df['Owner']==player].loc[:,'Rank'].values
@@ -164,11 +168,11 @@ if __name__ == "__main__":
     rank=range(1,7)
     results=pd.DataFrame()
     standings=get_standings(past)
-    for i in range(nSim):
+    for i in trange(nSim):
         run=do_sim(future, standings)
         run['Rank']=rank
         results=results.append(run)
-        print i
+        #print i
 
 
     results=results.sort_values(by='Owner')
